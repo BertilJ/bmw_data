@@ -131,6 +131,13 @@ class BMWCarDataCoordinator(DataUpdateCoordinator[dict[str, VehicleData]]):
             raise UpdateFailed(f"Token refresh error: {err}") from err
 
         for vin in self._vehicles:
+            if not vin:
+                _LOGGER.error(
+                    "Empty VIN in vehicle list — delete and re-add the "
+                    "integration to fix"
+                )
+                continue
+            _LOGGER.debug("Fetching telemetry for VIN: %s", vin)
             try:
                 entries = await self._api.get_telematic_data(vin)
                 self._merge_rest_data(vin, entries)

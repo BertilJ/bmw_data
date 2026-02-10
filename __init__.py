@@ -46,6 +46,12 @@ async def async_setup_entry(
         _LOGGER.error("No vehicles in config entry — cannot set up")
         return False
 
+    _LOGGER.debug(
+        "Setting up BMW CarData with %d vehicle(s): %s",
+        len(vehicles),
+        [(v.vin, v.model) for v in vehicles],
+    )
+
     # Create the coordinator
     coordinator = BMWCarDataCoordinator(hass, entry, vehicles, tokens)
 
