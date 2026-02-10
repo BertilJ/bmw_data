@@ -68,6 +68,7 @@ class BMWCarDataCoordinator(DataUpdateCoordinator[dict[str, VehicleData]]):
         self._api.set_token(tokens.access_token)
 
         self._mqtt: BMWMQTTStream | None = None
+        self._container_ids: list[str] = []
 
         # Initialize vehicle data store
         self.data: dict[str, VehicleData] = {
@@ -130,44 +131,72 @@ class BMWCarDataCoordinator(DataUpdateCoordinator[dict[str, VehicleData]]):
         except Exception as err:
             raise UpdateFailed(f"Token refresh error: {err}") from err
 
+        # Discover containers on first run
+        if not self._container_ids:
+            try:
+                containers = await self._api.get_containers()
+                _LOGGER.debug("Available containers: %s", containers)
+                for c in containers:
+                    if isinstance(c, dict):
+                        cid = c.get("containerId") or c.get("id") or c.get("container_id", "")
+                        if cid:
+                            self._container_ids.append(str(cid))
+                    elif isinstance(c, str):
+                        self._container_ids.append(c)
+                _LOGGER.info("Using container IDs: %s", self._container_ids)
+            except APIError as err:
+                _LOGGER.warning("Failed to fetch containers: %s", err)
+            except Exception as err:
+                _LOGGER.warning("Unexpected error fetching containers: %s", err)
+
         for vin in self._vehicles:
             if not vin:
-                _LOGGER.error(
-                    "Empty VIN in vehicle list — delete and re-add the "
-                    "integration to fix"
-                )
                 continue
             _LOGGER.debug("Fetching telemetry for VIN: %s", vin)
+
             try:
-                entries = await self._api.get_telematic_data(vin)
-                self._merge_rest_data(vin, entries)
-            except RateLimitExceeded:
-                _LOGGER.warning(
-                    "REST API rate limit reached — skipping poll. "
-                    "MQTT streaming continues."
-                )
-                break
-            except APIError as err:
-                if err.status == 401:
-                    raise ConfigEntryAuthFailed(
-                        "BMW API returned 401 — re-authenticate"
-                    ) from err
-                if err.status == 403:
-                    _LOGGER.warning(
-                        "Telemetry 403 for %s — have you configured "
-                        "containers in the BMW CarData portal? "
-                        "You need to set up data containers at "
-                        "cardata.bmwgroup.com before telemetry is available",
-                        vin,
-                    )
+                if self._container_ids:
+                    # Fetch telemetry for each container
+                    for cid in self._container_ids:
+                        await self._fetch_telemetry(vin, container_id=cid)
                 else:
-                    _LOGGER.warning("Failed to fetch telemetry for %s: %s", vin, err)
-            except Exception as err:
-                _LOGGER.warning(
-                    "Unexpected error fetching telemetry for %s: %s", vin, err
-                )
+                    # Try without container ID as fallback
+                    await self._fetch_telemetry(vin, container_id=None)
+            except RateLimitExceeded:
+                _LOGGER.warning("Rate limit hit — stopping REST polls")
+                break
 
         return self.data
+
+    async def _fetch_telemetry(
+        self, vin: str, container_id: str | None
+    ) -> None:
+        """Fetch telemetric data for a single VIN and container."""
+        try:
+            entries = await self._api.get_telematic_data(vin, container_id)
+            self._merge_rest_data(vin, entries)
+            _LOGGER.debug(
+                "Got %d entries for %s (container=%s)",
+                len(entries), vin, container_id,
+            )
+        except RateLimitExceeded:
+            _LOGGER.warning(
+                "REST API rate limit reached — skipping remaining polls"
+            )
+            raise
+        except APIError as err:
+            if err.status == 401:
+                raise ConfigEntryAuthFailed(
+                    "BMW API returned 401 — re-authenticate"
+                ) from err
+            _LOGGER.warning(
+                "Telemetry error for %s (container=%s): %s",
+                vin, container_id, err,
+            )
+        except Exception as err:
+            _LOGGER.warning(
+                "Unexpected error fetching telemetry for %s: %s", vin, err
+            )
 
     def _merge_rest_data(
         self, vin: str, entries: list[TelematicEntry]
