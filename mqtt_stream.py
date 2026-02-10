@@ -100,9 +100,20 @@ class BMWMQTTStream:
                 self._backoff = MQTT_RECONNECT_MIN
             except asyncio.CancelledError:
                 raise
-            except Exception:
-                _LOGGER.exception(
-                    "MQTT connection failed, reconnecting in %ds", self._backoff
+            except Exception as err:
+                err_str = str(err)
+                # Stop retrying on auth failures — won't recover without new tokens
+                if "135" in err_str or "Not authorized" in err_str:
+                    _LOGGER.error(
+                        "MQTT authentication rejected (code 135). "
+                        "Streaming disabled until next token refresh. "
+                        "Check that your BMW account has streaming access."
+                    )
+                    return
+                _LOGGER.warning(
+                    "MQTT connection failed, reconnecting in %ds: %s",
+                    self._backoff,
+                    err,
                 )
                 try:
                     await asyncio.wait_for(
@@ -117,7 +128,10 @@ class BMWMQTTStream:
 
     async def _connect_and_listen(self, aiomqtt: Any) -> None:
         """Connect to the MQTT broker and process messages."""
-        ssl_context = ssl.create_default_context()
+        # ssl.create_default_context() does blocking I/O (loads root certs)
+        # so it must run in an executor to avoid blocking HA's event loop
+        loop = asyncio.get_event_loop()
+        ssl_context = await loop.run_in_executor(None, ssl.create_default_context)
 
         client_id = f"{self._gcid}_ha"
 
