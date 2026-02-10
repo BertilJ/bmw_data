@@ -18,7 +18,7 @@
       }
     },
     "progress": {
-      "wait_for_authorization": "Waiting for you to authorize on the BMW website..."
+      "wait_for_authorization": "To complete setup, open the following link and enter the code:\n\n**URL:** [{url}]({url})\n\n**Code:** `{code}`\n\nWaiting for authorization..."
     },
     "error": {
       "device_code_failed": "Failed to get a device code from BMW. Check your client ID and try again."
