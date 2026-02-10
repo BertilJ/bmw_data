@@ -1,0 +1,11 @@
+{
+  "domain": "bmw_cardata",
+  "name": "BMW CarData",
+  "codeowners": [],
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "",
+  "iot_class": "cloud_polling",
+  "requirements": ["aiomqtt>=2.0.0"],
+  "version": "1.0.0"
+}

@@ -1,0 +1,74 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to BMW CarData",
+        "description": "Enter your BMW CarData client ID. You can create one at the BMW Car Data Portal.",
+        "data": {
+          "client_id": "Client ID"
+        }
+      },
+      "authorize": {
+        "title": "Authorize with BMW",
+        "description": "Open the link below and enter the code to authorize Home Assistant:\n\n**URL:** {url}\n\n**Code:** `{code}`\n\nWaiting for authorization..."
+      },
+      "reauth_confirm": {
+        "title": "Re-authenticate with BMW",
+        "description": "Your BMW authentication has expired. Press Submit to start re-authentication for client ID: {client_id}"
+      }
+    },
+    "progress": {
+      "wait_for_authorization": "Waiting for you to authorize on the BMW website..."
+    },
+    "error": {
+      "device_code_failed": "Failed to get a device code from BMW. Check your client ID and try again."
+    },
+    "abort": {
+      "already_configured": "This BMW account is already configured.",
+      "authorization_failed": "Authorization failed or timed out. Please try again.",
+      "no_device_code": "No device code available.",
+      "no_tokens": "No tokens received.",
+      "discovery_failed": "Failed to discover vehicles from BMW API.",
+      "no_vehicles": "No vehicles found on your BMW account.",
+      "reauth_successful": "Re-authentication successful.",
+      "reauth_failed": "Re-authentication failed.",
+      "device_code_failed": "Failed to request device code."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "battery_level": { "name": "Battery level" },
+      "range_electric": { "name": "Electric range" },
+      "charging_power": { "name": "Charging power" },
+      "charging_time_remaining": { "name": "Charging time remaining" },
+      "charging_status": { "name": "Charging status" },
+      "fuel_level": { "name": "Fuel level" },
+      "range_fuel": { "name": "Fuel range" },
+      "range_combined": { "name": "Combined range" },
+      "odometer": { "name": "Odometer" },
+      "tire_pressure_front_left": { "name": "Tire pressure front left" },
+      "tire_pressure_front_right": { "name": "Tire pressure front right" },
+      "tire_pressure_rear_left": { "name": "Tire pressure rear left" },
+      "tire_pressure_rear_right": { "name": "Tire pressure rear right" },
+      "outside_temperature": { "name": "Outside temperature" }
+    },
+    "binary_sensor": {
+      "door_driver_front": { "name": "Driver front door" },
+      "door_driver_rear": { "name": "Driver rear door" },
+      "door_passenger_front": { "name": "Passenger front door" },
+      "door_passenger_rear": { "name": "Passenger rear door" },
+      "window_driver_front": { "name": "Driver front window" },
+      "window_driver_rear": { "name": "Driver rear window" },
+      "window_passenger_front": { "name": "Passenger front window" },
+      "window_passenger_rear": { "name": "Passenger rear window" },
+      "hood": { "name": "Hood" },
+      "trunk": { "name": "Trunk" },
+      "locked": { "name": "Locked" },
+      "charging_active": { "name": "Charging active" },
+      "plugged_in": { "name": "Plugged in" }
+    },
+    "device_tracker": {
+      "location": { "name": "Location" }
+    }
+  }
+}
