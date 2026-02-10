@@ -225,10 +225,13 @@ class BMWCarDataAPI:
     async def discover_vehicles(self) -> list[VehicleBasicData]:
         """Discover all vehicles: get VIN list then fetch basic data for each."""
         vins = await self.get_vehicle_mappings()
+        _LOGGER.debug("Discovered VINs: %s", vins)
         vehicles: list[VehicleBasicData] = []
         for vin in vins:
             try:
                 basic = await self.get_vehicle_basic_data(vin)
+                # Always use VIN from mappings — basicData may not include it
+                basic.vin = vin
                 vehicles.append(basic)
             except APIError as err:
                 _LOGGER.warning("Failed to get basic data for %s: %s", vin, err)

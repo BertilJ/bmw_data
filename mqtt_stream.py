@@ -122,10 +122,15 @@ class BMWMQTTStream:
         client_id = f"{self._gcid}_ha"
 
         _LOGGER.debug(
-            "Connecting to MQTT broker %s:%d as %s",
+            "Connecting to MQTT broker %s:%d as %s "
+            "(gcid=%s, id_token=%s...%s, token_len=%d)",
             MQTT_BROKER,
             MQTT_PORT,
             client_id,
+            self._gcid or "(empty)",
+            self._id_token[:20] if self._id_token else "(empty)",
+            self._id_token[-10:] if self._id_token else "",
+            len(self._id_token) if self._id_token else 0,
         )
 
         async with aiomqtt.Client(

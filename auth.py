@@ -187,6 +187,12 @@ class BMWAuth:
             body = await resp.json(content_type=None)
 
             if resp.status == 200:
+                _LOGGER.debug(
+                    "Token response keys: %s, has id_token: %s, has gcid: %s",
+                    list(body.keys()),
+                    "id_token" in body,
+                    "gcid" in body,
+                )
                 return TokenResponse(
                     access_token=body["access_token"],
                     refresh_token=body["refresh_token"],

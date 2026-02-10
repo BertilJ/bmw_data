@@ -145,7 +145,16 @@ class BMWCarDataCoordinator(DataUpdateCoordinator[dict[str, VehicleData]]):
                     raise ConfigEntryAuthFailed(
                         "BMW API returned 401 — re-authenticate"
                     ) from err
-                _LOGGER.warning("Failed to fetch telemetry for %s: %s", vin, err)
+                if err.status == 403:
+                    _LOGGER.warning(
+                        "Telemetry 403 for %s — have you configured "
+                        "containers in the BMW CarData portal? "
+                        "You need to set up data containers at "
+                        "cardata.bmwgroup.com before telemetry is available",
+                        vin,
+                    )
+                else:
+                    _LOGGER.warning("Failed to fetch telemetry for %s: %s", vin, err)
             except Exception as err:
                 _LOGGER.warning(
                     "Unexpected error fetching telemetry for %s: %s", vin, err
