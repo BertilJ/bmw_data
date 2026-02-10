@@ -27,6 +27,9 @@ from .api import (
 from .auth import BMWAuth, TokenRefreshFailed, TokenResponse
 from .const import (
     CONF_CLIENT_ID,
+    DEFAULT_CONTAINER_DESCRIPTORS,
+    DEFAULT_CONTAINER_NAME,
+    DEFAULT_CONTAINER_PURPOSE,
     DEFAULT_POLL_INTERVAL,
     DOMAIN,
     TOKEN_REFRESH_MARGIN,
@@ -68,7 +71,7 @@ class BMWCarDataCoordinator(DataUpdateCoordinator[dict[str, VehicleData]]):
         self._api.set_token(tokens.access_token)
 
         self._mqtt: BMWMQTTStream | None = None
-        self._container_ids: list[str] = []
+        self._container_id: str = ""
 
         # Initialize vehicle data store
         self.data: dict[str, VehicleData] = {
@@ -131,23 +134,13 @@ class BMWCarDataCoordinator(DataUpdateCoordinator[dict[str, VehicleData]]):
         except Exception as err:
             raise UpdateFailed(f"Token refresh error: {err}") from err
 
-        # Discover containers on first run
-        if not self._container_ids:
-            try:
-                containers = await self._api.get_containers()
-                _LOGGER.debug("Available containers: %s", containers)
-                for c in containers:
-                    if isinstance(c, dict):
-                        cid = c.get("containerId") or c.get("id") or c.get("container_id", "")
-                        if cid:
-                            self._container_ids.append(str(cid))
-                    elif isinstance(c, str):
-                        self._container_ids.append(c)
-                _LOGGER.info("Using container IDs: %s", self._container_ids)
-            except APIError as err:
-                _LOGGER.warning("Failed to fetch containers: %s", err)
-            except Exception as err:
-                _LOGGER.warning("Unexpected error fetching containers: %s", err)
+        # Ensure we have a container ID
+        if not self._container_id:
+            await self._ensure_container()
+
+        if not self._container_id:
+            _LOGGER.warning("No container ID available — cannot fetch telemetry")
+            return self.data
 
         for vin in self._vehicles:
             if not vin:
@@ -155,21 +148,46 @@ class BMWCarDataCoordinator(DataUpdateCoordinator[dict[str, VehicleData]]):
             _LOGGER.debug("Fetching telemetry for VIN: %s", vin)
 
             try:
-                if self._container_ids:
-                    # Fetch telemetry for each container
-                    for cid in self._container_ids:
-                        await self._fetch_telemetry(vin, container_id=cid)
-                else:
-                    # Try without container ID as fallback
-                    await self._fetch_telemetry(vin, container_id=None)
+                await self._fetch_telemetry(vin, self._container_id)
             except RateLimitExceeded:
                 _LOGGER.warning("Rate limit hit — stopping REST polls")
                 break
 
         return self.data
 
+    async def _ensure_container(self) -> None:
+        """Find an existing container or create one."""
+        try:
+            containers = await self._api.get_containers()
+            _LOGGER.debug("Available containers: %s", containers)
+
+            # Reuse any existing container
+            for c in containers:
+                if isinstance(c, dict):
+                    cid = (
+                        c.get("containerId")
+                        or c.get("id")
+                        or c.get("container_id", "")
+                    )
+                    if cid:
+                        self._container_id = str(cid)
+                        _LOGGER.info("Reusing existing container: %s", cid)
+                        return
+
+            # No containers found — create one
+            _LOGGER.info("No containers found, creating one")
+            self._container_id = await self._api.create_container(
+                name=DEFAULT_CONTAINER_NAME,
+                purpose=DEFAULT_CONTAINER_PURPOSE,
+                descriptors=DEFAULT_CONTAINER_DESCRIPTORS,
+            )
+        except APIError as err:
+            _LOGGER.error("Container setup failed: %s", err)
+        except Exception as err:
+            _LOGGER.error("Unexpected error in container setup: %s", err)
+
     async def _fetch_telemetry(
-        self, vin: str, container_id: str | None
+        self, vin: str, container_id: str
     ) -> None:
         """Fetch telemetric data for a single VIN and container."""
         try:
@@ -243,27 +261,41 @@ class BMWCarDataCoordinator(DataUpdateCoordinator[dict[str, VehicleData]]):
     def _on_mqtt_message(self, vin: str, payload: dict[str, Any]) -> None:
         """Handle an incoming MQTT telemetry message.
 
-        Merges the data and triggers an immediate entity update via
-        async_set_updated_data(), bypassing the poll interval.
+        BMW MQTT payload format: {"vin": "...", "data": {"descriptor": {"value": ..., "unit": ..., "timestamp": ...}}}
+        The VIN from the topic is used (already extracted by mqtt_stream),
+        and the telemetry data is in the "data" dict using the same format
+        as the REST API's telematicData response.
         """
-        if vin not in self.data:
-            _LOGGER.debug("MQTT data for unknown VIN %s — ignoring", vin)
+        # Use VIN from payload if available, fall back to topic-extracted VIN
+        msg_vin = payload.get("vin", vin)
+        if msg_vin not in self.data:
+            _LOGGER.debug("MQTT data for unknown VIN %s — ignoring", msg_vin)
             return
 
-        vehicle = self.data[vin]
+        vehicle = self.data[msg_vin]
 
-        # MQTT payload can be a list of entries or a single dict
-        items = payload if isinstance(payload, list) else [payload]
-        for item in items:
-            name = item.get("name", "")
-            if name:
-                vehicle.telemetry[name] = TelematicEntry(
-                    name=name,
-                    value=str(item.get("value", "")),
-                    unit=item.get("unit"),
-                    timestamp=item.get("timestamp", ""),
-                )
+        # BMW wraps telemetry in a "data" dict: {descriptor: {value, unit, timestamp}}
+        data = payload.get("data") or {}
+        if not isinstance(data, dict):
+            _LOGGER.warning("MQTT payload 'data' is not a dict: %s", type(data))
+            return
 
+        count = 0
+        for descriptor, descriptor_payload in data.items():
+            if not isinstance(descriptor_payload, dict):
+                continue
+            value = descriptor_payload.get("value")
+            if value is None:
+                continue
+            vehicle.telemetry[descriptor] = TelematicEntry(
+                name=descriptor,
+                value=str(value),
+                unit=descriptor_payload.get("unit"),
+                timestamp=descriptor_payload.get("timestamp", ""),
+            )
+            count += 1
+
+        _LOGGER.debug("MQTT update for %s: %d descriptors", msg_vin, count)
         vehicle.mqtt_updated = time.time()
 
         # Trigger immediate entity refresh

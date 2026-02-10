@@ -26,11 +26,14 @@ _LOGGER = logging.getLogger(__name__)
 # Map string device class names to SensorDeviceClass enum
 _DEVICE_CLASS_MAP: dict[str, SensorDeviceClass] = {
     "battery": SensorDeviceClass.BATTERY,
+    "current": SensorDeviceClass.CURRENT,
     "distance": SensorDeviceClass.DISTANCE,
-    "power": SensorDeviceClass.POWER,
     "duration": SensorDeviceClass.DURATION,
-    "temperature": SensorDeviceClass.TEMPERATURE,
+    "energy_storage": SensorDeviceClass.ENERGY_STORAGE,
+    "power": SensorDeviceClass.POWER,
     "pressure": SensorDeviceClass.PRESSURE,
+    "temperature": SensorDeviceClass.TEMPERATURE,
+    "voltage": SensorDeviceClass.VOLTAGE,
 }
 
 # Map string state class names to SensorStateClass enum

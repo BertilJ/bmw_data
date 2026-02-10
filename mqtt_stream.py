@@ -133,7 +133,12 @@ class BMWMQTTStream:
         loop = asyncio.get_event_loop()
         ssl_context = await loop.run_in_executor(None, ssl.create_default_context)
 
-        client_id = f"{self._gcid}_ha"
+        # BMW broker requires TLS 1.2 — rejects TLS 1.3 negotiation
+        ssl_context.minimum_version = ssl.TLSVersion.TLSv1_2
+        ssl_context.maximum_version = ssl.TLSVersion.TLSv1_2
+
+        # Client ID must be exactly the gcid — any suffix causes auth rejection
+        client_id = self._gcid
 
         _LOGGER.debug(
             "Connecting to MQTT broker %s:%d as %s "
@@ -155,15 +160,15 @@ class BMWMQTTStream:
             identifier=client_id,
             tls_context=ssl_context,
             keepalive=MQTT_KEEPALIVE,
+            protocol=aiomqtt.ProtocolVersion.V311,
         ) as client:
             _LOGGER.info("MQTT connected to %s", MQTT_BROKER)
             self._backoff = MQTT_RECONNECT_MIN
 
-            # Subscribe to telemetry topics for each VIN
-            for vin in self._vins:
-                topic = f"cardata/{vin}/telemetry"
-                await client.subscribe(topic)
-                _LOGGER.debug("Subscribed to %s", topic)
+            # Subscribe to {gcid}/+ wildcard — BMW publishes to {gcid}/{vin}
+            topic = f"{self._gcid}/+"
+            await client.subscribe(topic)
+            _LOGGER.debug("Subscribed to %s", topic)
 
             async for message in client.messages:
                 if self._stop_event.is_set():
@@ -176,15 +181,18 @@ class BMWMQTTStream:
             topic = str(message.topic)
             payload = json.loads(message.payload.decode("utf-8"))
 
-            # Extract VIN from topic: cardata/{vin}/telemetry
+            # Extract VIN from topic: {gcid}/{vin}
             parts = topic.split("/")
             if len(parts) >= 2:
                 vin = parts[1]
             else:
-                _LOGGER.warning("Unexpected topic format: %s", topic)
+                _LOGGER.warning("Unexpected MQTT topic format: %s", topic)
                 return
 
-            _LOGGER.debug("MQTT message for %s: %d entries", vin, len(payload) if isinstance(payload, list) else 1)
+            _LOGGER.debug(
+                "MQTT message on %s (VIN=%s): %s",
+                topic, vin, type(payload).__name__,
+            )
             self._callback(vin, payload)
 
         except (json.JSONDecodeError, UnicodeDecodeError) as err:

@@ -44,32 +44,16 @@
       "battery_level": { "name": "Battery level" },
       "range_electric": { "name": "Electric range" },
       "charging_power": { "name": "Charging power" },
-      "charging_time_remaining": { "name": "Charging time remaining" },
       "charging_status": { "name": "Charging status" },
-      "fuel_level": { "name": "Fuel level" },
-      "range_fuel": { "name": "Fuel range" },
-      "range_combined": { "name": "Combined range" },
-      "odometer": { "name": "Odometer" },
-      "tire_pressure_front_left": { "name": "Tire pressure front left" },
-      "tire_pressure_front_right": { "name": "Tire pressure front right" },
-      "tire_pressure_rear_left": { "name": "Tire pressure rear left" },
-      "tire_pressure_rear_right": { "name": "Tire pressure rear right" },
-      "outside_temperature": { "name": "Outside temperature" }
+      "target_soc": { "name": "Target state of charge" },
+      "max_battery_energy": { "name": "Max battery energy" },
+      "avg_aux_power": { "name": "Average auxiliary power" },
+      "charging_ac_voltage": { "name": "Charging AC voltage" },
+      "charging_ac_current": { "name": "Charging AC current" },
+      "charging_phases": { "name": "Charging phases" }
     },
     "binary_sensor": {
-      "door_driver_front": { "name": "Driver front door" },
-      "door_driver_rear": { "name": "Driver rear door" },
-      "door_passenger_front": { "name": "Passenger front door" },
-      "door_passenger_rear": { "name": "Passenger rear door" },
-      "window_driver_front": { "name": "Driver front window" },
-      "window_driver_rear": { "name": "Driver rear window" },
-      "window_passenger_front": { "name": "Passenger front window" },
-      "window_passenger_rear": { "name": "Passenger rear window" },
-      "hood": { "name": "Hood" },
-      "trunk": { "name": "Trunk" },
-      "locked": { "name": "Locked" },
-      "charging_active": { "name": "Charging active" },
-      "plugged_in": { "name": "Plugged in" }
+      "charging_active": { "name": "Charging active" }
     },
     "device_tracker": {
       "location": { "name": "Location" }

@@ -35,133 +35,89 @@ RATE_LIMIT_WINDOW: Final = 86400  # 24 hours in seconds
 
 # ── Polling / Timing ────────────────────────────────────────────────────────
 
-DEFAULT_POLL_INTERVAL: Final = 1800  # 30 minutes
+DEFAULT_POLL_INTERVAL: Final = 2400  # 40 minutes
 TOKEN_REFRESH_MARGIN: Final = 300  # Refresh 5 minutes before expiry
 
 # ── MQTT Reconnection ───────────────────────────────────────────────────────
 
 MQTT_RECONNECT_MIN: Final = 5
-MQTT_RECONNECT_MAX: Final = 300
+MQTT_RECONNECT_MAX: Final = 60
 
 # ── Config Entry Keys ───────────────────────────────────────────────────────
 
 CONF_CLIENT_ID: Final = "client_id"
-CONF_ACCESS_TOKEN: Final = "access_token"
-CONF_REFRESH_TOKEN: Final = "refresh_token"
-CONF_ID_TOKEN: Final = "id_token"
-CONF_TOKEN_EXPIRY: Final = "token_expiry"
-CONF_GCID: Final = "gcid"
-CONF_VEHICLES: Final = "vehicles"
-CONF_CODE_VERIFIER: Final = "code_verifier"
+CONF_CONTAINER_ID: Final = "container_id"
+
+# ── Default Container Descriptors ────────────────────────────────────────────
+#
+# These are the telemetry data points requested when creating a container.
+# Based on the BMW CarData API HV battery + general vehicle descriptors.
+
+DEFAULT_CONTAINER_DESCRIPTORS: Final = [
+    "vehicle.drivetrain.batteryManagement.header",
+    "vehicle.drivetrain.electricEngine.charging.acAmpere",
+    "vehicle.drivetrain.electricEngine.charging.acVoltage",
+    "vehicle.drivetrain.electricEngine.charging.level",
+    "vehicle.drivetrain.electricEngine.charging.status",
+    "vehicle.drivetrain.electricEngine.remainingElectricRange",
+    "vehicle.powertrain.electric.battery.charging.power",
+    "vehicle.powertrain.electric.battery.stateOfCharge.target",
+    "vehicle.drivetrain.electricEngine.charging.phaseNumber",
+    "vehicle.drivetrain.batteryManagement.maxEnergy",
+    "vehicle.vehicle.avgAuxPower",
+    "vehicle.vehicleIdentification.basicVehicleData",
+]
+
+DEFAULT_CONTAINER_NAME: Final = "HA BMW CarData"
+DEFAULT_CONTAINER_PURPOSE: Final = "Home Assistant telemetry"
 
 # ── Telemetry Key → Sensor Mapping ──────────────────────────────────────────
 #
-# Each entry maps a BMW telemetry key to a tuple of:
+# Each entry maps a BMW descriptor to a tuple of:
 #   (translation_key, unit, device_class, state_class, precision)
-#
-# These drive dynamic sensor creation in sensor.py.
 
 SENSOR_KEY_MAP: Final[dict[str, tuple[str, str | None, str | None, str | None, int | None]]] = {
-    # ── Electric / HV Battery ────────────────────────────────────────────
-    "electricVehicle.chargingLevelHv": (
+    # ── Battery / Charging ───────────────────────────────────────────────
+    "vehicle.drivetrain.electricEngine.charging.level": (
         "battery_level", "%", "battery", "measurement", 0,
     ),
-    "electricVehicle.remainingRangeElectric": (
+    "vehicle.drivetrain.electricEngine.remainingElectricRange": (
         "range_electric", "km", "distance", "measurement", 0,
     ),
-    "electricVehicle.chargingPower": (
-        "charging_power", "kW", "power", "measurement", 2,
+    "vehicle.powertrain.electric.battery.charging.power": (
+        "charging_power", "W", "power", "measurement", 0,
     ),
-    "electricVehicle.chargingTimeRemaining": (
-        "charging_time_remaining", "min", "duration", None, 0,
-    ),
-    "electricVehicle.chargingStatus": (
+    "vehicle.drivetrain.electricEngine.charging.status": (
         "charging_status", None, None, None, None,
     ),
-    # ── Fuel (ICE / PHEV) ────────────────────────────────────────────────
-    "fuel.remainingFuel": (
-        "fuel_level", "L", None, "measurement", 1,
+    "vehicle.powertrain.electric.battery.stateOfCharge.target": (
+        "target_soc", "%", "battery", None, 0,
     ),
-    "fuel.remainingRangeFuel": (
-        "range_fuel", "km", "distance", "measurement", 0,
+    "vehicle.drivetrain.batteryManagement.maxEnergy": (
+        "max_battery_energy", "kWh", "energy_storage", None, 1,
     ),
-    # ── Combined Range ───────────────────────────────────────────────────
-    "remainingRangeCombined": (
-        "range_combined", "km", "distance", "measurement", 0,
+    "vehicle.vehicle.avgAuxPower": (
+        "avg_aux_power", "W", "power", "measurement", 0,
     ),
-    # ── Odometer ─────────────────────────────────────────────────────────
-    "odometer": (
-        "odometer", "km", "distance", "total_increasing", 0,
+    # ── AC Charging Details ──────────────────────────────────────────────
+    "vehicle.drivetrain.electricEngine.charging.acVoltage": (
+        "charging_ac_voltage", "V", "voltage", "measurement", 0,
     ),
-    # ── Tire Pressure (bar) ──────────────────────────────────────────────
-    "tirePressure.frontLeft": (
-        "tire_pressure_front_left", "bar", "pressure", "measurement", 1,
+    "vehicle.drivetrain.electricEngine.charging.acAmpere": (
+        "charging_ac_current", "A", "current", "measurement", 1,
     ),
-    "tirePressure.frontRight": (
-        "tire_pressure_front_right", "bar", "pressure", "measurement", 1,
-    ),
-    "tirePressure.rearLeft": (
-        "tire_pressure_rear_left", "bar", "pressure", "measurement", 1,
-    ),
-    "tirePressure.rearRight": (
-        "tire_pressure_rear_right", "bar", "pressure", "measurement", 1,
-    ),
-    # ── Temperature ──────────────────────────────────────────────────────
-    "outsideTemperature": (
-        "outside_temperature", "°C", "temperature", "measurement", 1,
+    "vehicle.drivetrain.electricEngine.charging.phaseNumber": (
+        "charging_phases", None, None, None, 0,
     ),
 }
 
 # ── Telemetry Key → Binary Sensor Mapping ────────────────────────────────────
 #
-# Each entry maps a BMW telemetry key to a tuple of:
+# Each entry maps a BMW descriptor to a tuple of:
 #   (translation_key, device_class, on_values)
-#
-# on_values is a set of raw string values considered "on" / True.
 
 BINARY_SENSOR_KEY_MAP: Final[dict[str, tuple[str, str | None, set[str]]]] = {
-    # ── Doors ────────────────────────────────────────────────────────────
-    "doors.driverFront": (
-        "door_driver_front", "door", {"OPEN"},
-    ),
-    "doors.driverRear": (
-        "door_driver_rear", "door", {"OPEN"},
-    ),
-    "doors.passengerFront": (
-        "door_passenger_front", "door", {"OPEN"},
-    ),
-    "doors.passengerRear": (
-        "door_passenger_rear", "door", {"OPEN"},
-    ),
-    # ── Windows ──────────────────────────────────────────────────────────
-    "windows.driverFront": (
-        "window_driver_front", "window", {"OPEN", "INTERMEDIATE"},
-    ),
-    "windows.driverRear": (
-        "window_driver_rear", "window", {"OPEN", "INTERMEDIATE"},
-    ),
-    "windows.passengerFront": (
-        "window_passenger_front", "window", {"OPEN", "INTERMEDIATE"},
-    ),
-    "windows.passengerRear": (
-        "window_passenger_rear", "window", {"OPEN", "INTERMEDIATE"},
-    ),
-    # ── Hood / Trunk ─────────────────────────────────────────────────────
-    "hood": (
-        "hood", "door", {"OPEN"},
-    ),
-    "trunk": (
-        "trunk", "door", {"OPEN"},
-    ),
-    # ── Lock State ───────────────────────────────────────────────────────
-    "doorLockState": (
-        "locked", "lock", {"LOCKED", "SECURED"},
-    ),
-    # ── Charging ─────────────────────────────────────────────────────────
-    "electricVehicle.chargingActive": (
-        "charging_active", "battery_charging", {"true", "TRUE", "CHARGING"},
-    ),
-    "electricVehicle.pluggedIn": (
-        "plugged_in", "plug", {"true", "TRUE", "CONNECTED"},
+    "vehicle.drivetrain.electricEngine.charging.status": (
+        "charging_active", "battery_charging", {"CHARGINGACTIVE"},
     ),
 }

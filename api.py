@@ -180,32 +180,47 @@ class BMWCarDataAPI:
     # ── Telemetric Data ──────────────────────────────────────────────────
 
     async def get_telematic_data(
-        self, vin: str, container_id: str | None = None
+        self, vin: str, container_id: str
     ) -> list[TelematicEntry]:
         """Get telemetric data for a vehicle.
 
-        Endpoint: GET /customers/vehicles/{vin}/telematicData
-        Optional query param: containerId
-        """
-        params: dict[str, str] = {}
-        if container_id:
-            params["containerId"] = container_id
+        Endpoint: GET /customers/vehicles/{vin}/telematicData?containerId={id}
 
+        BMW returns: {"telematicData": {"descriptor.key": {"value": "...",
+        "unit": "...", "timestamp": "..."}}}
+        """
         result = await self._request(
-            "GET", f"/customers/vehicles/{vin}/telematicData", params=params or None
+            "GET",
+            f"/customers/vehicles/{vin}/telematicData",
+            params={"containerId": container_id},
         )
 
         entries: list[TelematicEntry] = []
-        items = result if isinstance(result, list) else result.get("data", [])
-        for item in items:
-            entries.append(
-                TelematicEntry(
-                    name=item.get("name", ""),
-                    value=str(item.get("value", "")),
-                    unit=item.get("unit"),
-                    timestamp=item.get("timestamp", ""),
+        if not result:
+            return entries
+
+        # Response is {"telematicData": {key: {value, unit, timestamp}}}
+        telematic_data = result.get("telematicData", {})
+        if isinstance(telematic_data, dict):
+            for descriptor, data in telematic_data.items():
+                if not isinstance(data, dict):
+                    continue
+                value = data.get("value")
+                if value is None:
+                    continue
+                entries.append(
+                    TelematicEntry(
+                        name=descriptor,
+                        value=str(value),
+                        unit=data.get("unit"),
+                        timestamp=data.get("timestamp", ""),
+                    )
                 )
+        else:
+            _LOGGER.warning(
+                "Unexpected telematicData format: %s", type(telematic_data)
             )
+
         return entries
 
     # ── Container Management ─────────────────────────────────────────────
@@ -213,12 +228,42 @@ class BMWCarDataAPI:
     async def get_containers(self) -> list[dict[str, Any]]:
         """Get telemetry data containers.
 
-        Endpoint: GET /customers/containers/
+        Endpoint: GET /customers/containers
         """
-        result = await self._request("GET", "/customers/containers/")
+        result = await self._request("GET", "/customers/containers")
         if isinstance(result, list):
             return result
         return result.get("containers", [])
+
+    async def create_container(
+        self, name: str, purpose: str, descriptors: list[str]
+    ) -> str:
+        """Create a telemetry data container.
+
+        Endpoint: POST /customers/containers
+        Returns the container ID.
+        """
+        body = {
+            "name": name,
+            "purpose": purpose,
+            "technicalDescriptors": descriptors,
+        }
+        headers = {**self._headers(), "Content-Type": "application/json"}
+
+        self._check_rate_limit()
+        url = f"{API_BASE_URL}/customers/containers"
+        _LOGGER.debug("API POST %s", url)
+
+        async with self._session.post(url, headers=headers, json=body) as resp:
+            self._record_call()
+            if not 200 <= resp.status < 300:
+                text = await resp.text()
+                raise APIError(resp.status, text[:500])
+            result = await resp.json()
+
+        container_id = result.get("containerId", "")
+        _LOGGER.info("Created container '%s' with ID: %s", name, container_id)
+        return container_id
 
     # ── Convenience ──────────────────────────────────────────────────────
 
