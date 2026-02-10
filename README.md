@@ -54,3 +54,6 @@ Access tokens expire after 1 hour (auto-refreshed). Refresh tokens expire after 
 ## Diagnostics
 
 Go to **Settings → Devices & Services → BMW CarData → 3 dots → Download diagnostics** for a redacted diagnostic dump useful for troubleshooting.
+
+
+This is the URL how to set things up: https://www.bmw.co.uk/en-gb/mybmw/vehicle-overview (in English) and to get the 
