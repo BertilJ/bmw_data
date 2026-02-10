@@ -8,9 +8,9 @@
           "client_id": "Client ID"
         }
       },
-      "authorize": {
+      "open_link": {
         "title": "Authorize with BMW",
-        "description": "Open the link below and enter the code to authorize Home Assistant:\n\n**URL:** {url}\n\n**Code:** `{code}`\n\nWaiting for authorization..."
+        "description": "Open the link below in your browser and enter the code to authorize Home Assistant access to your BMW account.\n\n**URL:** [{url}]({url})\n\n**Code:** `{code}`\n\nAfter entering the code on the BMW website, click Submit below."
       },
       "reauth_confirm": {
         "title": "Re-authenticate with BMW",

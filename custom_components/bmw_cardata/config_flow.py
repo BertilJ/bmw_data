@@ -61,7 +61,7 @@ class BMWCarDataConfigFlow(ConfigFlow, domain=DOMAIN):
                 _LOGGER.error("Failed to request device code: %s", err)
                 errors["base"] = "device_code_failed"
             else:
-                return await self.async_step_authorize()
+                return await self.async_step_open_link()
 
         return self.async_show_form(
             step_id="user",
@@ -71,14 +71,40 @@ class BMWCarDataConfigFlow(ConfigFlow, domain=DOMAIN):
             errors=errors,
         )
 
-    # ── Step 2: Device Code Authorization ────────────────────────────────
+    # ── Step 2a: Show URL and Code ───────────────────────────────────────
+
+    async def async_step_open_link(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Show the verification URL and user code.
+
+        The user opens the link in a browser, enters the code, and clicks
+        Submit here to start polling for the authorization result.
+        """
+        if not self._device_code_resp:
+            return self.async_abort(reason="no_device_code")
+
+        if user_input is not None:
+            # User clicked Submit — start polling
+            return await self.async_step_authorize()
+
+        return self.async_show_form(
+            step_id="open_link",
+            data_schema=vol.Schema({}),
+            description_placeholders={
+                "url": self._device_code_resp.verification_uri_complete,
+                "code": self._device_code_resp.user_code,
+            },
+        )
+
+    # ── Step 2b: Poll for Authorization ──────────────────────────────────
 
     async def async_step_authorize(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Show device code and poll for authorization in background.
+        """Poll for authorization in background with progress spinner.
 
-        This method is called twice:
+        This method is called twice by the framework:
         1. Initially — creates the background task, shows progress spinner.
         2. On re-entry (when task completes) — checks result and advances.
         """
@@ -103,10 +129,6 @@ class BMWCarDataConfigFlow(ConfigFlow, domain=DOMAIN):
         return self.async_show_progress(
             step_id="authorize",
             progress_action="wait_for_authorization",
-            description_placeholders={
-                "url": self._device_code_resp.verification_uri_complete,
-                "code": self._device_code_resp.user_code,
-            },
             progress_task=self._login_task,
         )
 
@@ -235,7 +257,7 @@ class BMWCarDataConfigFlow(ConfigFlow, domain=DOMAIN):
                 _LOGGER.error("Reauth device code failed: %s", err)
                 return self.async_abort(reason="device_code_failed")
 
-            return await self.async_step_authorize()
+            return await self.async_step_open_link()
 
         return self.async_show_form(
             step_id="reauth_confirm",
