@@ -10,7 +10,11 @@
       },
       "open_link": {
         "title": "Authorize with BMW",
-        "description": "Open the link below in your browser and enter the code to authorize Home Assistant access to your BMW account.\n\n**URL:** [{url}]({url})\n\n**Code:** `{code}`\n\nAfter entering the code on the BMW website, click Submit below."
+        "description": "Open the URL below in your browser and enter the code shown to authorize Home Assistant. Then click Submit.",
+        "data": {
+          "verification_url": "Open this URL in your browser",
+          "user_code": "Enter this code on the BMW website"
+        }
       },
       "reauth_confirm": {
         "title": "Re-authenticate with BMW",

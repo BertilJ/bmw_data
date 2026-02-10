@@ -88,12 +88,20 @@ class BMWCarDataConfigFlow(ConfigFlow, domain=DOMAIN):
             # User clicked Submit — start polling
             return await self.async_step_authorize()
 
+        url = self._device_code_resp.verification_uri_complete
+        code = self._device_code_resp.user_code
+
         return self.async_show_form(
             step_id="open_link",
-            data_schema=vol.Schema({}),
+            data_schema=vol.Schema(
+                {
+                    vol.Optional("verification_url", default=url): str,
+                    vol.Optional("user_code", default=code): str,
+                }
+            ),
             description_placeholders={
-                "url": self._device_code_resp.verification_uri_complete,
-                "code": self._device_code_resp.user_code,
+                "url": url,
+                "code": code,
             },
         )
 
