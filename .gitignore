@@ -1,0 +1,5 @@
+custom_components/bmw_cardata/__pycache__
+bmw_cardata/__pycache__
+.DS_Store
+.vscode/
+.claude
