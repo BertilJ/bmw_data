@@ -133,9 +133,8 @@ class BMWMQTTStream:
         loop = asyncio.get_event_loop()
         ssl_context = await loop.run_in_executor(None, ssl.create_default_context)
 
-        # BMW broker requires TLS 1.2 — rejects TLS 1.3 negotiation
+        # Require at least TLS 1.2, allow negotiation up to TLS 1.3
         ssl_context.minimum_version = ssl.TLSVersion.TLSv1_2
-        ssl_context.maximum_version = ssl.TLSVersion.TLSv1_2
 
         # Client ID must be exactly the gcid — any suffix causes auth rejection
         client_id = self._gcid

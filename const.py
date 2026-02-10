@@ -107,7 +107,7 @@ SENSOR_KEY_MAP: Final[dict[str, tuple[str, str | None, str | None, str | None, i
         "charging_ac_current", "A", "current", "measurement", 1,
     ),
     "vehicle.drivetrain.electricEngine.charging.phaseNumber": (
-        "charging_phases", None, None, None, 0,
+        "charging_phases", None, None, None, None,
     ),
 }
 
