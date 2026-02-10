@@ -157,13 +157,17 @@ class BMWCarDataAPI:
         """Get list of VINs associated with the user's account.
 
         Endpoint: GET /customers/vehicles/mappings
-        Returns a list of VIN strings.
+        Returns a list of VIN strings, extracted from mapping objects.
         """
         result = await self._request("GET", "/customers/vehicles/mappings")
-        if isinstance(result, list):
-            return result
-        # Some API versions wrap in an object
-        return result.get("vins", result.get("mappings", []))
+        items = result if isinstance(result, list) else result.get("mappings", [])
+        vins: list[str] = []
+        for item in items:
+            if isinstance(item, str):
+                vins.append(item)
+            elif isinstance(item, dict) and "vin" in item:
+                vins.append(item["vin"])
+        return vins
 
     async def get_vehicle_basic_data(self, vin: str) -> VehicleBasicData:
         """Get basic vehicle information.
