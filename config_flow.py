@@ -197,13 +197,38 @@ class BMWCarDataConfigFlow(ConfigFlow, domain=DOMAIN):
             api.set_token(self._tokens.access_token)
 
             try:
-                self._vehicles = await api.discover_vehicles()
+                vins = await api.get_vehicle_mappings()
+                _LOGGER.debug("Discovered VINs from mappings: %s", vins)
+
+                for vin in vins:
+                    if not vin:
+                        continue
+                    try:
+                        basic = await api.get_vehicle_basic_data(vin)
+                        # Always use VIN from mappings — basicData may omit it
+                        basic.vin = vin
+                        self._vehicles.append(basic)
+                    except Exception as err:
+                        _LOGGER.warning(
+                            "Failed to get basic data for %s: %s", vin, err
+                        )
+                        self._vehicles.append(
+                            VehicleBasicData(
+                                vin=vin, brand="BMW", model="Unknown",
+                                propulsion="",
+                            )
+                        )
             except Exception as err:
                 _LOGGER.error("Vehicle discovery failed: %s", err)
                 return self.async_abort(reason="discovery_failed")
 
         if not self._vehicles:
             return self.async_abort(reason="no_vehicles")
+
+        _LOGGER.debug(
+            "Vehicles for config entry: %s",
+            [(v.vin, v.brand, v.model) for v in self._vehicles],
+        )
 
         # If this is a reauth flow, update the existing entry
         if self._reauth_entry:
@@ -213,7 +238,13 @@ class BMWCarDataConfigFlow(ConfigFlow, domain=DOMAIN):
 
     async def _create_entry(self) -> ConfigFlowResult:
         """Create the config entry with tokens and vehicle data."""
-        primary_vin = self._vehicles[0].vin
+        # Filter out any vehicles with empty VINs
+        valid_vehicles = [v for v in self._vehicles if v.vin]
+        if not valid_vehicles:
+            _LOGGER.error("No vehicles with valid VINs found")
+            return self.async_abort(reason="no_vehicles")
+
+        primary_vin = valid_vehicles[0].vin
         await self.async_set_unique_id(primary_vin)
         self._abort_if_unique_id_configured()
 
@@ -225,10 +256,12 @@ class BMWCarDataConfigFlow(ConfigFlow, domain=DOMAIN):
                 "propulsion": v.propulsion,
                 "construction_year": v.construction_year,
             }
-            for v in self._vehicles
+            for v in valid_vehicles
         ]
 
-        title = ", ".join(f"{v.brand} {v.model}" for v in self._vehicles)
+        _LOGGER.info("Creating config entry with VINs: %s", [v["vin"] for v in vehicle_data])
+
+        title = ", ".join(f"{v.brand} {v.model}" for v in valid_vehicles)
 
         return self.async_create_entry(
             title=title,
